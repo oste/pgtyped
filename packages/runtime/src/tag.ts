@@ -1,8 +1,10 @@
 import { SQLQueryIR, parseTSQuery, TSQueryAST } from '@pgtyped/parser';
 import { processSQLQueryIR } from './preprocessor-sql.js';
 import { processTSQueryAST } from './preprocessor-ts.js';
+import { processTSQueryASTForAWS } from './preprocessor-ts-aws.js';
 
 export interface IDatabaseConnection {
+  isAWS?: boolean;
   query: (query: string, bindings: any[]) => Promise<{ rows: any[] }>;
 }
 
@@ -37,10 +39,9 @@ export class TaggedQuery<TTypePair extends { params: any; result: any }> {
   constructor(query: TSQueryAST) {
     this.query = query;
     this.run = async (params, connection) => {
-      const { query: processedQuery, bindings } = processTSQueryAST(
-        this.query,
-        params as any,
-      );
+      const { query: processedQuery, bindings } = connection.isAWS
+        ? processTSQueryASTForAWS(this.query, params as any)
+        : processTSQueryAST(this.query, params as any);
       const result = await connection.query(processedQuery, bindings);
       return mapQueryResultRows(result.rows);
     };
